@@ -1,0 +1,237 @@
+# butterfly: An R package for the verification of continually updating timeseries data where we expect new values, but want to ensure previous data remains unchanged.
+
+\#\> left out bibliography: paper.bib from yaml
+
+## **Active work in progress!**
+
+## Summary
+
+Previously recorded data could be revised after initial publication
+number of reasons, such as discovery of an inconsistency or error, a
+change in methodology or instrument re-calibration. When using other
+data to generate your own, it is crucial to reference the exact version
+of the data used, in order to maintain data provenance. Unnoticed
+changes in previous data could have unintended consequences, such as
+invalidating a published dataset’s Digital Object Identfier (DOI), or
+altering future predictions if used as input in forecasting models.
+
+But what if you are not aware of upstream changes to your input data?
+Monitoring data sources for these changes is not always possible. Here
+we present butterfly, an R package for the verification of continually
+updating timeseries data where we expect new values, but want to ensure
+previous data remains unchanged.
+
+The intention of butterfly is to check for changes in previously
+published data, and warn the user with a report that contains as much
+details as possible. This will allow them to stop unintended data
+transfer, revise their published data, release a new version and
+communicate the significance of the change to their users.
+
+## Statement of Need
+
+Semantic versioning is widely adopted in research software
+[(Preston-Werner 2013)](https://semver.org/spec/v2.0.0.html), but as
+outlined above datasets may also change for any number of reasons. It is
+therefore important to cite the exact extract of data you are using in
+your research to maintain reproducibility [(Klump et
+al. 2021)](https://datascience.codata.org/articles/10.5334/dsj-2021-012).
+It is not only important to indicate to users that there has been a
+change, but also **what** that change is.
+
+This may be especially relevant for Information Management Frameworks
+for Digital Twins (Siddorn et al. 2022). A digital twin might rely on
+any number of source data, whether live sensor streams or environmental
+forecasting models. To achieve a FAIR implementation (Wilkinson et
+al. 2016) of a Digital Twin, data provenance must be maintained, clearly
+documented for users and available in machine-readable format.
+
+To ensure trustworthiness, apply appropriate versioning and maintain the
+integrity of our published dataset DOI’s we require tools to monitor and
+quality control changes in them. This is what butterfly aims to provide.
+The underlying functionality is largely based on the waldo package, and
+it also follows waldo’s philosophy of being as verbose as possible
+(Wickham).
+
+Below we describe two case studies where we applied butterfly in work
+done at the British Antarctic Survey.
+
+### Case Study 1: unexpected changes in models
+
+The Amundsen Seas Low (ASL) is a highly dynamic and mobile
+climatological low pressure system located in the Pacific sector of the
+Southern Ocean. In this sector, variability in sea-level pressure is
+greater than anywhere in the Southern Hemisphere, making it challenging
+to isolate local fluctuations in the ASL from larger-scale shifts in
+atmospheric pressure. The position and strength of the ASL are crucial
+for understanding regional change over West Antarctica (Hosking et
+al. 2016). To calculate the ASL indices and generate our dataset, we use
+ERA5 data (Hersbach et al. 2023).
+
+This package was originally developed to deal with
+[ERA5](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=documentation)’s
+initial release data, ERA5T. ERA5T data for a month is overwritten with
+the final ERA5 data two months after the month in question. Usually ERA5
+and ERA5T are identical, but occasionally an issue with input data can
+(for example for [09/21 -
+12/21](https://confluence.ecmwf.int/display/CKB/ERA5T+issue+in+snow+depth),
+and
+[07/24](https://forum.ecmwf.int/t/final-validated-era5-product-to-differ-from-era5t-in-july-2024/6685))
+force a recalculation, meaning previously published data differs from
+the final product.
+
+In most cases, this is not an issue. For static data publications which
+are a snapshot in time, such as research that uses ERA5 data and is
+associated with a specific paper, as in “Forecasts, neural networks, and
+results from the paper: ‘Seasonal Arctic sea ice forecasting with
+probabilistic deep learning’” [Andersson & Hosking
+(2021)](https://data.bas.ac.uk/full-record.php?id=GB/NERC/BAS/PDC/01526)
+or time period as in “Downscaled ERA5 monthly precipitation data using
+Multi-Fidelity Gaussian Processes between 1980 and 2012 for the Upper
+Beas and Sutlej Basins, Himalaya” [Tazi
+(2023)](https://data.bas.ac.uk/full-record.php?id=GB/NERC/BAS/PDC/01769),
+this is not an issue. These datasets clearly describe a version and time
+period of ERA5 from which the data were derived, and will not be amended
+or updated in the future, even if ERA5 is recalculated.
+
+In our case however we want to continually append ERA5-derived ASL
+calculations **and** continually publish them. This would be useful when
+functioning as a data source for an environmental digital twin (Blair &
+Henrys et al. 2023), or simply as input data into an environmental
+forecasting model which itself is frequently running.
+
+Continually appending **and** publishing will require strict quality
+assurance. Any change in any change in previous ERA5 data, will also
+change the results of all our previous ASL calculations. If this
+happened and we overwrite our dataset, we would be changing values in an
+already-published dataset. Or, if we append our existing dataset, anyone
+attempting to reproduce our methods would get different results, because
+previous calculations are not based on the same version of ERA5. Either
+way, our DOI will be invalidated.
+
+In butterfly,
+[`loupe()`](https://docs.ropensci.org/butterfly/reference/loupe.md) is
+provided to examine in detail whether previous values have changed, and
+returns TRUE/FALSE for no change/change. To manipulate changed data,
+[`catch()`](https://docs.ropensci.org/butterfly/reference/catch.md)
+“catches” the changes and returns them in a dataframe, while
+[`release()`](https://docs.ropensci.org/butterfly/reference/release.md)
+“releases” the changes and returns a dataframe without the detected
+changes.
+
+We use the functionality in this package in an automated data processing
+pipeline to detect changes, stop data transfer and notify the user. The
+full methods are described in this
+[article](https://thomaszwagerman.github.io/butterfly/articles/butterfly_in_pipeline.html)
+and source code is available in [this
+repository](https://github.com/antarctica/asli-pipeline) (Zwagerman &
+Wilby)
+
+### Case Study 2: unexpected changes in data acquisition
+
+Measuring instruments can have different behaviours when they have a
+power failure. For example, during power failure an internal clock could
+reset to “1970-01-01”, or the manufacturing date (e.g. a Raspberry Pi
+manufactured in 2021 will return to “2021-01-01”, one manufactured in
+2022 to “2022-01-01” etc). If we are automatically ingesting and
+processing this data, it would be great to get a head’s up that a time
+series is no longer continuous in the way we expect it to be. We could
+also mistake new data as “previous” data. This could have consequences
+for any calculation happening downstream.
+
+To prevent writing different ways of checking for this depending on the
+instrument, we wrote
+[`butterfly::timeline()`](https://docs.ropensci.org/butterfly/reference/timeline.md).
+It will return TRUE/FALSE depending on whether a time series is deemed
+continuous, based on an expected time step between each measurement.
+
+#### Variable measurement frequencies
+
+In other cases, a non-continuous timeseries is intentional, for example
+when there is temporal variability in the measurements taken depending
+on events. At BAS, we collect data from a penguin weighbridge on
+weighbridge on Bird Island, South Georgia. This weighbridge measure
+weight on two different load cells (scales) to determine penguin weight
+and direction.
+
+You can read about this work in more detail in [Afanasyev et
+al. (2015)](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0126292),
+but the important point here is that the weighbridge does not collect
+continuous measurement. When no weight is detected on the load cells, it
+only samples at 1hz, but as soon as any change in weight is detected it
+will start collecting data at 100hz. This is of course intentional, to
+reduce the sheer volume of data we need to process, but also has another
+benefit in isolating (or attempting to) individual crossings.
+
+The individual crossings are the most valuables pieces of data, as these
+allow us to deduce some sort of information like weight, direction (from
+colony to sea, or sea to colony) and hopefully ultimately, diet.
+
+In this case separating distinct, but continuous segments of data is
+required. This is the reasoning behind
+[`timeline_group()`](https://docs.ropensci.org/butterfly/reference/timeline_group.md).
+This function allows us to split our timeseries in groups of individual
+crossings.
+
+## Acknowledgements
+
+## References
+
+Expect formatting changes below.
+
+Afanasyev V, Buldyrev SV, Dunn MJ, Robst J, Preston M, et al. 2015.
+Increasing Accuracy: A New Design and Algorithm for Automatically
+Measuring Weights, Travel Direction and Radio Frequency Identification
+(RFID) of Penguins. PLOS ONE 10(4): e0126292.
+<https://doi.org/10.1371/journal.pone.0126292>
+
+Andersson, T., & Hosking, J. 2021. Forecasts, neural networks, and
+results from the paper: ‘Seasonal Arctic sea ice forecasting with
+probabilistic deep learning’ (Version 1.0) \[Data set\]. NERC EDS UK
+Polar Data Centre.
+<https://doi.org/10.5285/71820e7d-c628-4e32-969f-464b7efb187c>
+
+Blair, Gordon S., and Peter A. Henrys. 2023. “The Role of Data Science
+in Environmental Digital Twins: In Praise of the Arrows.” Environmetrics
+34 (January): Not available. <https://doi.org/10.1002/env.2789>.
+
+Hersbach, H., Bell, B., Berrisford, P., Biavati, G., Horányi, A., Muñoz
+Sabater, J., Nicolas, J., Peubey, C., Radu, R., Rozum, I., Schepers, D.,
+Simmons, A., Soci, C., Dee, D., Thépaut, J-N. (2023): ERA5 hourly data
+on single levels from 1940 to present. Copernicus Climate Change Service
+(C3S) Climate Data Store (CDS), DOI: 10.24381/cds.adbb2d47
+
+Hosking, J. S., A. Orr, T. J. Bracegirdle, and J. Turner. 2016. Future
+circulation changes off West Antarctica: Sensitivity of the Amundsen Sea
+Low to projected anthropogenic forcing, Geophys. Res. Lett., 43,
+367–376, <doi:10.1002/2015GL067143>.
+
+Klump, J., Wyborn, L., Wu, M., Martin, J., Downs, R.R. and Asmi, A.
+2021. ‘Versioning Data Is About More than Revisions: A Conceptual
+Framework and Proposed Principles’, Data Science Journal, 20(1), p. 12.
+Available at: <https://doi.org/10.5334/dsj-2021-012>.
+
+Preston-Werner, T. 2013. Semantic Versioning 2.0.0. Semantic Versioning.
+Available at <https://semver.org/spec/v2.0.0.html> \[Last accessed 28
+October 2024\].
+
+Siddorn, John, Gordon Shaw Blair, David Boot, Justin James Henry Buck,
+Andrew Kingdon, et al. 2022. “An Information Management Framework for
+Environmental Digital Twins (IMFe).” Zenodo.
+<https://doi.org/10.5281/ZENODO.7004351>.
+
+Tazi, K. 2023. Downscaled ERA5 monthly precipitation data using
+Multi-Fidelity Gaussian Processes between 1980 and 2012 for the Upper
+Beas and Sutlej Basins, Himalayas (Version 1.0) \[Data set\]. NERC EDS
+UK Polar Data Centre.
+<https://doi.org/10.5285/b2099787-b57c-44ae-bf42-0d46d9ec87cc>
+
+Wickham, H. waldo: Find Differences Between R Objects \[Computer
+software\]. <https://github.com/r-lib/waldo>
+
+Wilkinson, Mark D., Michel Dumontier, IJsbrand Jan Aalbersberg,
+Gabrielle Appleton, Myles Axton, et al. 2016. “The FAIR Guiding
+Principles for Scientific Data Management and Stewardship.” Scientific
+Data 3 (1). <https://doi.org/10.1038/sdata.2016.18>.
+
+Zwagerman, T., & Wilby, D. (2024). asli-pipeline (0.1.0). Zenodo.
+<https://doi.org/10.5281/zenodo.14552486>

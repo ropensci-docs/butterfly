@@ -1,0 +1,13 @@
+{
+  "commit": {
+    "commit": "882b7ae805cdcfbff7f92102a2ff433db663aed9",
+    "author": "Thomas Zwagerman <36264706+thomaszwagerman@users.noreply.github.com>",
+    "time": "2026-07-14T18:13:00Z",
+    "files": 1,
+    "merge": true,
+    "message": "Merge pull request #47 from ropensci/tz/pkgdown_error\n\nFix asli csv url"
+  },
+  "repo": "https://github.com/ropensci/butterfly",
+  "pkg": "butterfly",
+  "time": "2026-09-12T08:44:37Z"
+}
